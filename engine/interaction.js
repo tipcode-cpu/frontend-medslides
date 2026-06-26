@@ -216,25 +216,26 @@
     if (el) el.addEventListener(ev, function (e) { try { fn(e); } catch (_) {} });
   }
 
-  /* ---- Title auto-fit: shrink an overflowing (e.g. 3-line) title to fit its
-     box, like PowerPoint "shrink text on overflow". Layout is at the fixed 1920
-     design size, so this is viewport-independent — fit once after fonts load. */
-  function fitTitles() {
-    var titles = document.querySelectorAll(".ds-title");
-    for (var i = 0; i < titles.length; i++) {
-      var t = titles[i], boxEl = t.closest(".fm-obj");
-      if (!boxEl) continue;
-      t.style.setProperty("--ds-title-fit", "1");
-      var max = boxEl.clientHeight, fit = 1, g = 0;
-      while (t.scrollHeight > max + 1 && fit > 0.5 && g < 20) {
+  /* ---- Text auto-fit: shrink any overflowing title OR body text box to fit
+     its box, like PowerPoint "shrink text on overflow". Layout is at the fixed
+     1920 design size, so this is viewport-independent — fit once after fonts. */
+  function fitTextBoxes() {
+    var boxes = document.querySelectorAll(".fm-obj");
+    for (var i = 0; i < boxes.length; i++) {
+      var box = boxes[i];
+      var content = box.querySelector(".ds-title, .ds-body, .ds-annotation, .ds-section-title");
+      if (!content) continue;
+      box.style.setProperty("--fm-fit", "1");
+      var max = box.clientHeight, fit = 1, g = 0;
+      while (content.scrollHeight > max + 1 && fit > 0.45 && g < 22) {
         fit -= 0.05; g++;
-        t.style.setProperty("--ds-title-fit", fit.toFixed(2));
+        box.style.setProperty("--fm-fit", fit.toFixed(2));
       }
     }
   }
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitles);
-  window.addEventListener("load", fitTitles);
-  setTimeout(fitTitles, 500);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTextBoxes);
+  window.addEventListener("load", fitTextBoxes);
+  setTimeout(fitTextBoxes, 500);
 
   /* init indicator */
   var ind = document.getElementById("fm-indicator");

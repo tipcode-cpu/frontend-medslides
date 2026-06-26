@@ -75,9 +75,9 @@ def run_spans(runs, F, fallback_pt, fit=False):
         st = ""
         sz = r.get("fontSize") or fallback_pt
         if sz:
-            # titles: size is scalable via --ds-title-fit so JS can auto-shrink
-            # an overflowing (e.g. 3-line) title to fit its box (PowerPoint autofit).
-            st += ("font-size:calc(%gpx * var(--ds-title-fit, 1));" if fit else "font-size:%gpx;") % (sz * F)
+            # autofit: size scalable via --fm-fit so JS can shrink overflowing
+            # title/body text to fit its box (PowerPoint "shrink text on overflow").
+            st += ("font-size:calc(%gpx * var(--fm-fit, 1));" if fit else "font-size:%gpx;") % (sz * F)
         st += "font-weight:%s;" % (r.get("fontWeight") or 400)
         if r.get("italic"):
             st += "font-style:italic;"
@@ -119,7 +119,7 @@ def render_paras(paras, F, fallback_pt, bullets=True, fit=False):
             bsz = bullet_px(p, fb, F)                       # proportional to text, not tiny
             bf = ("font-family:%s;" % family(p["bulletFont"])) if p.get("bulletFont") else ""
             bc = ("color:%s;" % p["bulletColor"]) if p.get("bulletColor") else ""
-            bullet = ('<span class="ppt-bullet" style="font-size:%gpx;%s%s">%s</span>'
+            bullet = ('<span class="ppt-bullet" style="font-size:calc(%gpx * var(--fm-fit,1));%s%s">%s</span>'
                       % (bsz, bf, bc, escape(p["bullet"])))
         text = '<span class="ppt-bullet-text">%s</span>' % run_spans(p["runs"], F, fb, fit)
         html.append('<div class="ds-para" style="%s">%s%s</div>'
@@ -176,14 +176,14 @@ def render_object(o, F, ds, extract_dir):
         if role == "title":
             inner = '<h1 class="ds-title">%s</h1>' % render_paras(paras, F, ds.get("titleSizePt") or 40, bullets=False, fit=True)
         elif role == "section-title":
-            inner = '<h2 class="ds-section-title">%s</h2>' % render_paras(paras, F, 32, bullets=False)
+            inner = '<h2 class="ds-section-title">%s</h2>' % render_paras(paras, F, 32, bullets=False, fit=True)
         elif role in ("footer", "citation"):
             cls = "ds-citation" if role == "citation" else "ds-footer-inline"
             inner = '<div class="%s">%s</div>' % (cls, render_paras(paras, F, 13, bullets=False))
         elif role == "annotation":
-            inner = '<div class="ds-annotation">%s</div>' % render_paras(paras, F, 18, bullets=False)
+            inner = '<div class="ds-annotation">%s</div>' % render_paras(paras, F, 18, bullets=False, fit=True)
         else:
-            inner = '<div class="ds-body">%s</div>' % render_paras(paras, F, 28, bullets=True)
+            inner = '<div class="ds-body">%s</div>' % render_paras(paras, F, 28, bullets=True, fit=True)
         return '<div class="fm-obj" style="%s">%s</div>' % (box(o), inner)
 
     if t == "table":
