@@ -35,8 +35,10 @@
   --ds-ink: #1a1a1a;            /* primary text */
   --ds-ink-muted: #555;         /* captions */
   --ds-brand: #1f4e79;          /* institutional blue */
-  --ds-brand-line: #1f4e79;     /* the bottom blue line */
+  --ds-brand-line: #0070c0;     /* the bottom blue line */
   --ds-accent: #c00000;
+  --ds-title-color: #1f3864;    /* dark navy title (from source) */
+  --ds-title-shadow: 1.5px 1.5px 2px rgba(0,0,0,0.28);  /* depth effect */
 
   /* --- Spacing / chrome geometry tokens (stage px) --- */
   --ds-margin-x: 96px;
@@ -60,8 +62,10 @@
   font-family: var(--ds-font-sans);
   font-size: var(--ds-title-size);
   font-weight: var(--ds-title-weight);
-  line-height: var(--ds-line);
+  line-height: 1.15;
   color: var(--ds-title-color, var(--ds-ink));
+  text-align: center;                 /* content-slide titles are centered in source */
+  text-shadow: var(--ds-title-shadow);
 }
 .ds-section-title {
   margin: 0;
@@ -191,6 +195,38 @@
   justify-content: space-between;
   z-index: 5;
 }
+
+/* === Video (Media Engine) ====================================== */
+.ds-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.ds-video-fallback {
+  width: 100%; height: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #000;
+  position: relative;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.ds-video-badge {
+  margin: 8px;
+  padding: 6px 12px;
+  font-family: var(--ds-font-sans);
+  font-size: 16px;
+  color: #fff;
+  background: rgba(192,0,0,.85);
+  border-radius: 6px;
+}
+
+/* === Shared slide chrome (auto-inserted on every slide) ======== */
+.ds-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+.ds-chrome .ds-bottom-line,
+.ds-chrome .ds-logo-box { position: absolute; }
+.ds-chrome .ds-logo-box img { width: 100%; height: 100%; object-fit: contain; }
 
 /* Raw runs of text from PowerPoint keep inline emphasis (italic/bold/sup/sub). */
 .fm-run-b { font-weight: 700; }
