@@ -257,6 +257,15 @@
   border-radius: 6px;
 }
 
+/* === Inline HTML simulator (hyperlinked .html embedded live) ===== */
+.ds-sim-box { pointer-events: auto; box-shadow: 0 2px 14px rgba(0,0,0,.18); border: 1px solid #cdd6e0; background: #fff; }
+.ds-simulator { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+.ds-sim-open {
+  position: absolute; top: 6px; right: 6px;
+  font: 13px var(--ds-font-sans); text-decoration: none;
+  color: #fff; background: rgba(31,56,100,.9); padding: 2px 8px; border-radius: 5px;
+}
+
 /* === Shared slide chrome (auto-inserted on every slide) ======== */
 .ds-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
 .ds-chrome .ds-bottom-line,

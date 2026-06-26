@@ -140,6 +140,16 @@ def render_object(o, F, ds, extract_dir):
         return '<div class="fm-obj" style="%s">%s</div>' % (box(o), inner)
 
     if t == "image":
+        # interactive HTML simulator embedded inline (runs directly in the slide)
+        if role == "simulator" and (o.get("simulatorLocal") or o.get("simulatorUrl")):
+            local = o.get("simulatorLocal")
+            src = local if (local and exists(extract_dir, local)) else o.get("simulatorUrl")
+            live = o.get("simulatorUrl") or src
+            return ('<div class="fm-obj ds-sim-box" style="%s" data-id="%s">'
+                    '<iframe class="ds-simulator" src="%s" loading="lazy" '
+                    'sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups"></iframe>'
+                    '<a class="ds-sim-open" href="%s" target="_blank" rel="noopener">↗ open</a></div>'
+                    % (box(o), o["id"], escape(src), escape(live)))
         if not exists(extract_dir, o.get("src")):
             return missing_box(o, "image")
         if role == "background":      # full-slide bg image: behind, not zoomable

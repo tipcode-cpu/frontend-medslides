@@ -24,6 +24,7 @@ import json
 import os
 import shutil
 import sys
+import urllib.request
 import zipfile
 from collections import Counter
 
@@ -325,6 +326,38 @@ class Engine:
                 pass
         return {"src": "assets/logos/" + name, "fileSize": len(blob), "dimensions": dims}
 
+    # --- interactive HTML simulator (hyperlinked .html) ---
+    def save_simulator(self, url):
+        """Download a referenced HTML simulator for offline inline embedding.
+        Best-effort: returns local rel path, or None (build falls back to URL)."""
+        name = url.rsplit("/", 1)[-1].split("?")[0] or "simulator.html"
+        d = os.path.join(self.assets, "simulators")
+        os.makedirs(d, exist_ok=True)
+        dst = os.path.join(d, name)
+        # urllib with an unverified SSL context (Windows certs often fail), then curl
+        try:
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.Request(url, headers={"User-Agent": "frontend-medslides"})
+            with urllib.request.urlopen(req, timeout=20, context=ctx) as r:
+                data = r.read()
+            if data:
+                open(dst, "wb").write(data)
+                return "assets/simulators/" + name
+        except Exception:
+            pass
+        try:
+            import subprocess
+            subprocess.run(["curl", "-sL", "-m", "25", url, "-o", dst],
+                           capture_output=True, timeout=30)
+            if os.path.exists(dst) and os.path.getsize(dst) > 0:
+                return "assets/simulators/" + name
+        except Exception:
+            pass
+        return None
+
     # --- video ---
     def save_video(self, slide_no, idx, pic, slide):
         vf = pic.find(".//" + A + "videoFile")
@@ -457,7 +490,17 @@ def walk(shapes, eng, W, H, slide, slide_no, ids, objs, xform=None, counters=Non
                 ids["image"] += 1
                 o = {"id": "image-%03d" % ids["image"], "type": "image",
                      "role": "logo" if small else "figure", "zIndex": len(objs)}
-                o.update(geo); o.update(rec); objs.append(o)
+                o.update(geo); o.update(rec)
+                # hyperlink to an .html simulator -> embed it live inline (iframe)
+                hl = sh._element.find(".//" + A + "hlinkClick")
+                if hl is not None:
+                    hrel = slide.part.rels.get(hl.get(R + "id"))
+                    if (hrel is not None and getattr(hrel, "is_external", False)
+                            and (hrel.target_ref or "").lower().rsplit("?", 1)[0].endswith((".html", ".htm"))):
+                        o["role"] = "simulator"
+                        o["simulatorUrl"] = hrel.target_ref
+                        o["simulatorLocal"] = eng.save_simulator(hrel.target_ref)
+                objs.append(o)
                 continue
 
         # table
