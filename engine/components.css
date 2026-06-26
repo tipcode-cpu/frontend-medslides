@@ -196,6 +196,31 @@
   z-index: 5;
 }
 
+/* === Body text hierarchy (per-paragraph, resolved from PPTX) ==== */
+.ds-body, .ds-annotation {
+  font-family: var(--ds-font-sans);
+  color: var(--ds-ink);
+}
+.ds-para { margin: 0; }
+.ds-para span { line-height: inherit; }
+.ds-bullet {                       /* main/sub bullet, navy like source */
+  color: var(--ds-title-color);
+  font-weight: 700;
+}
+.ds-annotation { color: var(--ds-ink); }
+
+/* === Missing-asset placeholder (P0: never a broken image) ======= */
+.ds-missing {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  box-sizing: border-box; padding: 8px;
+  background: repeating-linear-gradient(45deg, #fbeaea, #fbeaea 12px, #f5d6d6 12px, #f5d6d6 24px);
+  border: 2px dashed #c00;
+  color: #a00;
+  font-family: var(--ds-font-sans);
+  font-size: 20px; font-weight: 700;
+}
+
 /* === Video (Media Engine) ====================================== */
 .ds-video {
   width: 100%;
