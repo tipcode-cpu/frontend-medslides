@@ -10,11 +10,16 @@
 /* --- Navigation controls (mouse-first, unobtrusive) --- */
 .fm-controls {
   position: fixed;
-  z-index: 50;
+  z-index: 130;
   bottom: 18px; right: 18px;
   display: flex; gap: 8px;
   font-family: system-ui, sans-serif;
+  opacity: 0; transition: opacity .25s; pointer-events: none;
 }
+/* show bottom controls only when the mouse is near the bottom edge */
+body.fm-show-controls .fm-controls { opacity: 1; pointer-events: auto; }
+body.fm-show-controls #fm-indicator { opacity: 1; }
+#fm-indicator { transition: opacity .25s; }
 .fm-controls button,
 .fm-viewer__bar button {
   cursor: pointer;
@@ -44,7 +49,7 @@
 .fm-nav-zone {
   position: absolute;
   top: 0; bottom: 0;
-  z-index: 1;                 /* above bg, below figures/videos/chrome */
+  z-index: 5;                 /* above bg; figures/videos/sim (z 10+) sit ABOVE this */
   pointer-events: auto;
 }
 .fm-nav-zone-left  { left: 0;   width: 25%; cursor: w-resize; }

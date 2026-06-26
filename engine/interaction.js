@@ -65,17 +65,34 @@
       case "End": show(slides.length - 1); break;
       case "f": case "F": toggleFullscreen(); break;
       case "d": case "D": toggleDebug(); break;
-      case "Escape": if (viewerOpen) closeViewer(); break;
+      case "Escape": if (viewerOpen) closeViewer(); else if (simFs) exitSimFs(); break;
     }
   });
 
   /* ---- PowerPoint-like mouse navigation via invisible zones ----
      Text has pointer-events:none so its clicks fall through to the zone beneath;
      figures/videos capture their own clicks. Disabled while the viewer is open. */
+  var simFs = false, simBox = null;
+  function exitSimFs() {
+    if (simBox) simBox.classList.remove("fm-sim-fs");
+    simFs = false; simBox = null;
+  }
   document.addEventListener("click", function (e) {
-    if (viewerOpen) return;
+    // simulator fullscreen / close (buttons live above figures, capture first)
+    var full = e.target.closest && e.target.closest(".ds-sim-full");
+    if (full) { simBox = full.closest(".ds-sim-box"); if (simBox) { simBox.classList.add("fm-sim-fs"); simFs = true; } return; }
+    var close = e.target.closest && e.target.closest(".ds-sim-close");
+    if (close) { exitSimFs(); return; }
+    if (viewerOpen || simFs) return;                 // nav disabled while overlay open
+    // navigate ONLY from empty background (nav zones). Figures/videos/simulators
+    // sit above the zones and capture their own clicks, so they never advance.
     var zone = e.target.closest && e.target.closest(".fm-nav-zone");
     if (zone) { zone.getAttribute("data-nav") === "prev" ? prev() : next(); }
+  });
+
+  /* auto-hide bottom controls unless the mouse is near the bottom edge */
+  window.addEventListener("mousemove", function (e) {
+    document.body.classList.toggle("fm-show-controls", e.clientY > window.innerHeight * 0.86);
   });
 
   /* ---- Debug overlay (press D) ---- */

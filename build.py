@@ -32,7 +32,12 @@ def read(p):
 
 
 def box(o):
-    return "left:%dpx;top:%dpx;width:%dpx;height:%dpx;" % (o["x"], o["y"], o["width"], o["height"])
+    s = "left:%dpx;top:%dpx;width:%dpx;height:%dpx;" % (o["x"], o["y"], o["width"], o["height"])
+    # explicit z-order from PPTX document order, so figures/videos/simulators sit
+    # ABOVE the nav zones (z 5) and capture their own clicks. Background stays at 0.
+    if "zIndex" in o and o.get("role") != "background":
+        s += "z-index:%d;" % (10 + o["zIndex"])
+    return s
 
 
 def family(font):
@@ -148,7 +153,11 @@ def render_object(o, F, ds, extract_dir):
             return ('<div class="fm-obj ds-sim-box" style="%s" data-id="%s">'
                     '<iframe class="ds-simulator" src="%s" loading="lazy" '
                     'sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups"></iframe>'
-                    '<a class="ds-sim-open" href="%s" target="_blank" rel="noopener">↗ open</a></div>'
+                    '<div class="ds-sim-tools">'
+                    '<button class="ds-sim-full" title="전체화면 시뮬레이터">⛶ 전체화면</button>'
+                    '<a class="ds-sim-open" href="%s" target="_blank" rel="noopener" title="새 탭">↗</a>'
+                    '<button class="ds-sim-close" title="닫기">✕</button>'
+                    '</div></div>'
                     % (box(o), o["id"], escape(src), escape(live)))
         if not exists(extract_dir, o.get("src")):
             return missing_box(o, "image")
@@ -260,8 +269,16 @@ def tokens_css(ds):
 
 def render_slide(slide, F, ds, chrome, extract_dir):
     n = slide["slideNumber"]
+    # Simulator = interactive first-class content -> occupy (almost) the whole slide.
+    has_title = any(o.get("type") == "text" and o.get("role") == "title"
+                    and (o.get("plainText") or "").strip() for o in slide["objects"])
     for o in slide["objects"]:
         o["_slide"] = n
+        if o.get("role") == "simulator":
+            if has_title:
+                o["x"], o["y"], o["width"], o["height"] = 40, 120, 1840, 860
+            else:                       # no title -> full usable canvas above footer
+                o["x"], o["y"], o["width"], o["height"] = 0, 0, 1920, 1020
     objs = "".join(render_object(o, F, ds, extract_dir) for o in slide["objects"])
     active = " is-active" if n == 1 else ""
     # invisible nav zones: above bg, below figures/videos (text passes clicks through)

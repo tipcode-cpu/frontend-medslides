@@ -258,16 +258,35 @@
 }
 
 /* === Inline HTML simulator (hyperlinked .html embedded live) ===== */
-.ds-sim-box { pointer-events: auto; box-shadow: 0 2px 14px rgba(0,0,0,.18); border: 1px solid #cdd6e0; background: #fff; }
-.ds-simulator { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
-.ds-sim-open {
-  position: absolute; top: 6px; right: 6px;
-  font: 13px var(--ds-font-sans); text-decoration: none;
-  color: #fff; background: rgba(31,56,100,.9); padding: 2px 8px; border-radius: 5px;
+.ds-sim-box {
+  pointer-events: auto;
+  box-shadow: 0 2px 14px rgba(0,0,0,.18);
+  border: 1px solid #cdd6e0;
+  background: #fff;
 }
+.ds-simulator { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+.ds-sim-tools {
+  position: absolute; top: 8px; right: 8px;
+  display: flex; gap: 6px; align-items: center;
+  font: 13px var(--ds-font-sans);
+}
+.ds-sim-tools button, .ds-sim-open {
+  cursor: pointer; border: 0; text-decoration: none;
+  color: #fff; background: rgba(31,56,100,.92);
+  padding: 4px 10px; border-radius: 6px; font-size: 13px;
+}
+.ds-sim-tools button:hover, .ds-sim-open:hover { background: rgba(31,56,100,1); }
+.ds-sim-close { display: none; }            /* only in fullscreen */
+/* Simulator fullscreen-within-slide: cover the whole slide canvas */
+.ds-sim-box.fm-sim-fs {
+  position: absolute; inset: 0; z-index: 90;
+  border: 0; box-shadow: none;
+}
+.ds-sim-box.fm-sim-fs .ds-sim-close { display: inline-block; }
+.ds-sim-box.fm-sim-fs .ds-sim-full { display: none; }
 
 /* === Shared slide chrome (auto-inserted on every slide) ======== */
-.ds-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+.ds-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
 .ds-chrome .ds-bottom-line,
 .ds-chrome .ds-logo-box { position: absolute; }
 .ds-chrome .ds-logo-box img { width: 100%; height: 100%; object-fit: contain; }
