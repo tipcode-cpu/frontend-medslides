@@ -64,9 +64,57 @@
       case "Home": show(0); break;
       case "End": show(slides.length - 1); break;
       case "f": case "F": toggleFullscreen(); break;
+      case "d": case "D": toggleDebug(); break;
       case "Escape": if (viewerOpen) closeViewer(); break;
     }
   });
+
+  /* ---- PowerPoint-like mouse navigation via invisible zones ----
+     Text has pointer-events:none so its clicks fall through to the zone beneath;
+     figures/videos capture their own clicks. Disabled while the viewer is open. */
+  document.addEventListener("click", function (e) {
+    if (viewerOpen) return;
+    var zone = e.target.closest && e.target.closest(".fm-nav-zone");
+    if (zone) { zone.getAttribute("data-nav") === "prev" ? prev() : next(); }
+  });
+
+  /* ---- Debug overlay (press D) ---- */
+  var dbg = document.createElement("div");
+  dbg.id = "fm-debug-info";
+  document.body.appendChild(dbg);
+  function toggleDebug() {
+    document.body.classList.toggle("fm-debug");
+    markOverlaps();
+  }
+  function markOverlaps() {
+    var on = document.body.classList.contains("fm-debug");
+    var slide = slides[idx];
+    var objsEl = slide ? slide.querySelectorAll(".fm-obj") : [];
+    var figs = [], texts = [], miss = 0;
+    Array.prototype.forEach.call(objsEl, function (el) {
+      el.classList.remove("fm-overlap");
+      if (el.querySelector(".ds-figure__img, .ds-video, .ds-video-fallback")) figs.push(el);
+      else if (el.querySelector(".ds-body, .ds-title, .ds-annotation, .ds-para")) texts.push(el);
+      if (el.querySelector(".ds-missing")) miss++;
+    });
+    var overlaps = 0;
+    texts.forEach(function (t) {
+      var a = t.getBoundingClientRect();
+      figs.forEach(function (f) {
+        var b = f.getBoundingClientRect();
+        var ox = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+        var oy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        if (ox * oy > 0.08 * Math.min(a.width * a.height, b.width * b.height)) {
+          overlaps++; t.classList.add("fm-overlap"); f.classList.add("fm-overlap");
+        }
+      });
+    });
+    if (on) dbg.textContent = "slide " + (idx + 1) + " / " + slides.length +
+      "\nobjects: " + objsEl.length + "  figures: " + figs.length + "  texts: " + texts.length +
+      "\noverlaps: " + overlaps + "  missing: " + miss;
+  }
+  var _origShow = show;
+  show = function (i) { _origShow(i); if (document.body.classList.contains("fm-debug")) markOverlaps(); };
 
   function toggleFullscreen() {
     try {

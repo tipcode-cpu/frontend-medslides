@@ -34,10 +34,16 @@ def main():
     extract_dir = os.path.join(work, "extract")
     build_dir = os.path.join(work, "build")
 
-    if step("1/3 Extraction Engine", [PY, os.path.join(HERE, "extractor", "extraction_engine.py"), pptx, extract_dir]):
+    if step("1/4 Extraction Engine", [PY, os.path.join(HERE, "extractor", "extraction_engine.py"), pptx, extract_dir]):
         print("Extraction failed; stopping."); sys.exit(1)
 
-    rc = step("2/3 Validation Engine", [PY, os.path.join(HERE, "validation", "validate.py"), extract_dir])
+    rc = step("2/4 Raw media cross-check", [PY, os.path.join(HERE, "extractor", "raw_media.py"), extract_dir])
+    if rc == 2 and not force:
+        print("\nRaw media cross-check found P0 errors (referenced media not emitted).")
+        print("See %s/validation/media-map.json" % extract_dir)
+        sys.exit(2)
+
+    rc = step("3/4 Validation Engine", [PY, os.path.join(HERE, "validation", "validate.py"), extract_dir])
     if rc not in (0, 2):
         print("Validation errored; stopping."); sys.exit(1)
     if rc == 2 and not force:
@@ -48,7 +54,7 @@ def main():
     gen = [PY, os.path.join(HERE, "build.py"), extract_dir, build_dir]
     if force:
         gen.append("--force")
-    if step("3/3 HTML Generator", gen):
+    if step("4/4 HTML Generator", gen):
         print("HTML generation refused/failed."); sys.exit(1)
 
     print("\nDone. Open %s/presentation.html" % build_dir)

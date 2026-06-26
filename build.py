@@ -36,7 +36,22 @@ def box(o):
 
 
 def family(font):
-    return ('"%s", var(--ds-font-sans)' % font) if font else "var(--ds-font-sans)"
+    # Defense-in-depth: never emit invalid CSS font-family (e.g. theme refs '+mn-lt').
+    if not font or not isinstance(font, str):
+        return "var(--ds-font-sans)"
+    f = font.strip().replace('"', "").replace(";", "")
+    if not f or f.startswith("+"):
+        return "var(--ds-font-sans)"
+    return '"%s", var(--ds-font-sans)' % f
+
+
+def bullet_px(p, fallback_pt, F):
+    """Bullet size = PPT bullet size if specified, else the paragraph text size."""
+    if p.get("bulletSizePts"):
+        return p["bulletSizePts"] * F
+    if p.get("bulletSizePct"):
+        return fallback_pt * p["bulletSizePct"] * F
+    return fallback_pt * F
 
 
 def exists(extract_dir, rel):
@@ -94,10 +109,14 @@ def render_paras(paras, F, fallback_pt, bullets=True):
         fb = max((r.get("fontSize") for r in p["runs"] if r.get("fontSize")), default=fallback_pt)
         bullet = ""
         if bullets and p.get("bullet") and p["runs"]:
+            bsz = bullet_px(p, fb, F)                       # proportional to text, not tiny
             bf = ("font-family:%s;" % family(p["bulletFont"])) if p.get("bulletFont") else ""
-            bullet = '<span class="ds-bullet" style="%s">%s </span>' % (bf, escape(p["bullet"]))
+            bc = ("color:%s;" % p["bulletColor"]) if p.get("bulletColor") else ""
+            bullet = ('<span class="ppt-bullet" style="font-size:%gpx;%s%s">%s</span>'
+                      % (bsz, bf, bc, escape(p["bullet"])))
+        text = '<span class="ppt-bullet-text">%s</span>' % run_spans(p["runs"], F, fb)
         html.append('<div class="ds-para" style="%s">%s%s</div>'
-                    % (para_style(p, F), bullet, run_spans(p["runs"], F, fb)))
+                    % (para_style(p, F), bullet, text))
     return "".join(html)
 
 
@@ -123,11 +142,13 @@ def render_object(o, F, ds, extract_dir):
     if t == "image":
         if not exists(extract_dir, o.get("src")):
             return missing_box(o, "image")
+        if role == "background":      # full-slide bg image: behind, not zoomable
+            return '<div class="fm-obj fm-bg-image" style="%s"><img src="%s" alt=""></div>' % (box(o), escape(o["src"]))
         if role == "logo":
             inner = '<img class="ds-logo" src="%s" alt="logo">' % escape(o["src"])
         else:
-            inner = '<figure class="ds-figure"><img class="ds-figure__img" src="%s" alt="figure"></figure>' % escape(o["src"])
-        return '<div class="fm-obj" style="%s">%s</div>' % (box(o), inner)
+            inner = '<figure class="ds-figure"><img class="ds-figure__img" src="%s" alt="figure" data-id="%s"></figure>' % (escape(o["src"]), o["id"])
+        return '<div class="fm-obj" style="%s" data-id="%s">%s</div>' % (box(o), o["id"], inner)
 
     if t == "text":
         paras = o["paragraphs"]
@@ -164,6 +185,42 @@ def render_object(o, F, ds, extract_dir):
     return ""
 
 
+def _area(o):
+    return max(0, o.get("width", 0)) * max(0, o.get("height", 0))
+
+
+def _overlap(a, b):
+    ox = max(0, min(a["x"] + a["width"], b["x"] + b["width"]) - max(a["x"], b["x"]))
+    oy = max(0, min(a["y"] + a["height"], b["y"] + b["height"]) - max(a["y"], b["y"]))
+    return ox * oy
+
+
+def layout_report(slides):
+    """Detect text↔figure/video overlaps. A small text fully inside a figure is an
+    intentional label; larger intersections are flagged as unintended."""
+    rep = []
+    for s in slides:
+        n = s["slideNumber"]
+        texts = [o for o in s["objects"] if o.get("type") == "text" and o.get("role") not in ("footer", "citation")]
+        figs = [o for o in s["objects"] if o.get("type") in ("image", "video") and o.get("role") in ("figure", "video")]
+        for t in texts:
+            for fobj in figs:
+                ov = _overlap(t, fobj)
+                if ov <= 0:
+                    continue
+                ratio = ov / max(1, min(_area(t), _area(fobj)))
+                inside = (t["x"] >= fobj["x"] - 4 and t["y"] >= fobj["y"] - 4 and
+                          t["x"] + t["width"] <= fobj["x"] + fobj["width"] + 4 and
+                          t["y"] + t["height"] <= fobj["y"] + fobj["height"] + 4)
+                label = inside and _area(t) < 0.25 * _area(fobj)
+                if ratio < 0.08:
+                    continue
+                rep.append({"slide": n, "textId": t["id"], "figureId": fobj["id"],
+                            "overlapPx": int(ov), "ratio": round(ratio, 3),
+                            "classification": "label (intentional)" if label else "unintended"})
+    return rep
+
+
 def chrome_layer(chrome):
     if not chrome:
         return ""
@@ -197,8 +254,11 @@ def render_slide(slide, F, ds, chrome, extract_dir):
         o["_slide"] = n
     objs = "".join(render_object(o, F, ds, extract_dir) for o in slide["objects"])
     active = " is-active" if n == 1 else ""
-    return '<section class="fm-slide%s" data-n="%d"><div class="ds-bg"></div>%s%s</section>' % (
-        active, n, objs, chrome_layer(chrome))
+    # invisible nav zones: above bg, below figures/videos (text passes clicks through)
+    zones = ('<div class="fm-nav-zone fm-nav-zone-left" data-nav="prev"></div>'
+             '<div class="fm-nav-zone fm-nav-zone-right" data-nav="next"></div>')
+    return ('<section class="fm-slide%s" data-n="%d"><div class="ds-bg"></div>%s%s%s</section>'
+            % (active, n, zones, objs, chrome_layer(chrome)))
 
 
 def main():
@@ -258,8 +318,14 @@ def main():
 
     with open(os.path.join(outdir, "presentation.html"), "w", encoding="utf-8") as f:
         f.write(html)
+
+    lr = layout_report(slides)
+    json.dump(lr, open(os.path.join(outdir, "layout-report.json"), "w", encoding="utf-8"),
+              ensure_ascii=False, indent=2)
+    unintended = [x for x in lr if x["classification"] == "unintended"]
     print("HTML generated -> %s/presentation.html  (%d slides, validation=%s)"
           % (outdir, len(slides), vstatus))
+    print("  layout-report: %d overlaps (%d unintended)" % (len(lr), len(unintended)))
 
 
 if __name__ == "__main__":

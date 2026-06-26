@@ -50,6 +50,21 @@ WINGDINGS = {0x76: "❖", 0xa7: "▪", 0x2022: "•", 0x2013: "–", 0xbb: "»",
 ALGN = {"l": "left", "ctr": "center", "r": "right", "just": "justify"}
 
 MASTER_LEVELS = {"title": {}, "body": {}}
+THEME_FONTS = {"+mj": None, "+mn": None}   # major/minor theme fonts, set in main
+
+
+def sanitize_font(name):
+    """Drop invalid CSS font names. PowerPoint theme refs like '+mn-lt', '+mj-ea'
+    are NOT real fonts -> resolve to the theme font or None (token fallback)."""
+    if not name or not isinstance(name, str):
+        return None
+    name = name.strip()
+    if not name:
+        return None
+    if name.startswith("+"):
+        resolved = THEME_FONTS.get(name[:3])      # '+mn' / '+mj'
+        return resolved if (resolved and not resolved.startswith("+")) else None
+    return name
 
 
 # ---------- helpers: color / geometry ----------
@@ -120,7 +135,16 @@ def parse_props(el):
             ch = bc.get("char")[0]
             sym = fam and any(s in fam.lower() for s in ("wingding", "webding", "symbol"))
             p["bullet"] = WINGDINGS.get(ord(ch), ch) if sym else ch
-            p["bulletFont"] = None if sym else fam
+            p["bulletFont"] = None if sym else sanitize_font(fam)
+    # bullet size (percent of text, or points) and color
+    bsp, bspt = el.find("a:buSzPct", NS), el.find("a:buSzPts", NS)
+    if bsp is not None:
+        p["bulletSizePct"] = int(bsp.get("val")) / 100000.0
+    elif bspt is not None:
+        p["bulletSizePts"] = int(bspt.get("val")) / 100.0
+    bclr = el.find("a:buClr//a:srgbClr", NS)
+    if bclr is not None:
+        p["bulletColor"] = "#" + bclr.get("val").lower()
     df = el.find("a:defRPr", NS)
     if df is not None:
         if df.get("sz"):
@@ -132,7 +156,7 @@ def parse_props(el):
             p["color"] = "#" + sr.get("val").lower()
         lt = df.find("a:latin", NS)
         if lt is not None:
-            p["fontFamily"] = lt.get("typeface")
+            p["fontFamily"] = sanitize_font(lt.get("typeface"))
     return p
 
 
@@ -162,6 +186,28 @@ def ph_levels(shape):
         return {}
 
 
+def parse_run_props(rPr):
+    """Run properties from a:rPr (mirrors defRPr; sanitizes theme fonts)."""
+    p = {}
+    if rPr is None:
+        return p
+    if rPr.get("sz"):
+        p["fontSize"] = int(rPr.get("sz")) / 100.0
+    if rPr.get("b") is not None:
+        p["fontWeight"] = 700 if rPr.get("b") == "1" else 400
+    if rPr.get("i") is not None:
+        p["italic"] = rPr.get("i") == "1"
+    if rPr.get("u") not in (None, "none"):
+        p["underline"] = True
+    sr = rPr.find("a:solidFill/a:srgbClr", NS)
+    if sr is not None:
+        p["color"] = "#" + sr.get("val").lower()
+    lt = rPr.find("a:latin", NS)
+    if lt is not None:
+        p["fontFamily"] = sanitize_font(lt.get("typeface"))
+    return p
+
+
 def resolve_paragraphs(tf, group, phlv):
     mlv = MASTER_LEVELS.get(group, {})
     out = []
@@ -173,24 +219,29 @@ def resolve_paragraphs(tf, group, phlv):
         eff.update(parse_props(p._p.find("a:pPr", NS)))
         pdef = {"fontSize": eff.get("fontSize"), "fontWeight": eff.get("fontWeight"),
                 "color": eff.get("color"), "fontFamily": eff.get("fontFamily")}
+        # Iterate XML children so soft line breaks <a:br/> are preserved
+        # (python-pptx paragraph.runs drops them -> wrong wrapping -> overlaps).
         runs = []
-        for r in p.runs:
-            f = r.font
-            rp = dict(pdef)
-            if f.size is not None:
-                rp["fontSize"] = f.size.pt
-            if f.bold is not None:
-                rp["fontWeight"] = 700 if f.bold else 400
-            col = rgb_or_none(f.color) if r.text else None
-            if col:
-                rp["color"] = col
-            if f.name:
-                rp["fontFamily"] = f.name
-            runs.append({"text": r.text, "fontFamily": rp["fontFamily"],
-                         "fontSize": rp["fontSize"], "fontWeight": rp["fontWeight"] or 400,
-                         "italic": bool(f.italic), "underline": bool(f.underline),
-                         "color": rp["color"]})
+        for child in p._p:
+            tag = child.tag.split("}")[-1]
+            if tag == "br":
+                runs.append({"text": "\n", "fontFamily": pdef["fontFamily"], "fontSize": pdef["fontSize"],
+                             "fontWeight": pdef["fontWeight"] or 400, "italic": False,
+                             "underline": False, "color": pdef["color"]})
+            elif tag in ("r", "fld"):
+                t = child.find("a:t", NS)
+                text = t.text if (t is not None and t.text) else ""
+                if not text:
+                    continue
+                rp = dict(pdef)
+                rp.update(parse_run_props(child.find("a:rPr", NS)))
+                runs.append({"text": text, "fontFamily": rp.get("fontFamily"),
+                             "fontSize": rp.get("fontSize"), "fontWeight": rp.get("fontWeight") or 400,
+                             "italic": bool(rp.get("italic")), "underline": bool(rp.get("underline")),
+                             "color": rp.get("color")})
         out.append({"level": lvl, "bullet": eff.get("bullet"), "bulletFont": eff.get("bulletFont"),
+                    "bulletSizePct": eff.get("bulletSizePct"), "bulletSizePts": eff.get("bulletSizePts"),
+                    "bulletColor": eff.get("bulletColor"),
                     "indent": eff.get("indent", 0), "marginLeft": eff.get("marginLeft", 0),
                     "align": eff.get("align"),
                     "lineSpacingPct": eff.get("lineSpacingPct"), "lineSpacingPts": eff.get("lineSpacingPts"),
@@ -212,9 +263,9 @@ class Engine:
         os.makedirs(os.path.join(extract_dir, "validation"), exist_ok=True)
 
     # --- images ---
-    def save_image(self, slide_no, idx, blob, ext, rid, orig_name):
+    def save_image(self, slide_no, rid, blob, ext, orig_name):
         ext = (ext or "bin").lower()
-        base = "s%02d_img%02d" % (slide_no, idx)
+        base = "s%02d_%s" % (slide_no, rid)
         rec = {"relId": rid, "originalName": orig_name, "format": ext,
                "fileSize": len(blob), "dimensions": None, "src": None,
                "original": None, "status": "ok", "error": ""}
@@ -334,16 +385,25 @@ class Engine:
 
 
 # ---------- object building per slide ----------
-def blip_relinfo(pic_el, slide):
-    blip = pic_el.find(".//" + A + "blip")
-    rid = blip.get(R + "embed") if blip is not None else None
-    name = None
-    try:
-        rel = slide.part.rels.get(rid)
-        name = str(rel.target_partname) if rel else None
-    except Exception:
-        pass
-    return rid, name
+def fill_blip_rid(el):
+    """rId of a picture FILL blip on this shape — covers p:pic, and a:blipFill on
+    autoshapes / picture placeholders (which python-pptx's shape.image MISSES).
+    Excludes bullet pictures (a:buBlip)."""
+    for blip in el.iter(A + "blip"):
+        parent = blip.getparent()
+        if parent is not None and parent.tag.endswith("blipFill"):
+            rid = blip.get(R + "embed") or blip.get(R + "link")
+            if rid:
+                return rid
+    return None
+
+
+def bg_blip_rid(slide_el):
+    bg = slide_el.find(".//" + P + "bg")
+    if bg is None:
+        return None
+    blip = bg.find(".//" + A + "blip")
+    return (blip.get(R + "embed") or blip.get(R + "link")) if blip is not None else None
 
 
 def walk(shapes, eng, W, H, slide, slide_no, ids, objs, xform=None, counters=None):
@@ -351,7 +411,12 @@ def walk(shapes, eng, W, H, slide, slide_no, ids, objs, xform=None, counters=Non
     for sh in shapes:
         st = getattr(sh, "shape_type", None)
         if st == MSO_SHAPE_TYPE.GROUP:
+            start = len(objs)
+            counters["grp"] = counters.get("grp", 0) + 1
+            gid = "g%03d" % counters["grp"]
             walk(sh.shapes, eng, W, H, slide, slide_no, ids, objs, group_child_transform(sh), counters)
+            for o in objs[start:]:
+                o.setdefault("groupId", gid)
             continue
         geo = px_box(sh, W, H, xform)
 
@@ -364,23 +429,36 @@ def walk(shapes, eng, W, H, slide, slide_no, ids, objs, xform=None, counters=Non
             o.update(geo); o.update(rec); objs.append(o)
             continue
 
-        # picture (image / logo)
-        if st == MSO_SHAPE_TYPE.PICTURE:
-            counters["img"] += 1
-            rid, orig_name = blip_relinfo(sh._element, slide)
-            try:
-                img = sh.image
-                rec = eng.save_image(slide_no, counters["img"], img.blob, img.ext, rid, orig_name)
-            except Exception as e:
-                rec = {"relId": rid, "originalName": orig_name, "format": None, "fileSize": 0,
-                       "dimensions": None, "src": None, "original": None,
-                       "status": "failed", "error": "image extract: %s" % e}
-            small = geo["width"] < STAGE_W * 0.18 and geo["height"] < STAGE_H * 0.18 and geo["y"] < STAGE_H * 0.14
-            ids["image"] += 1
-            o = {"id": "image-%03d" % ids["image"], "type": "image",
-                 "role": "logo" if small else "figure"}
-            o.update(geo); o.update(rec); objs.append(o)
-            continue
+        # image: ANY shape carrying a picture fill blip (Picture, picture-filled
+        # autoshape, picture placeholder). python-pptx Picture-only extraction
+        # misses fills/placeholders -> that was the source of missing figures.
+        rid = fill_blip_rid(sh._element)
+        if rid is not None and sh._element.find(".//" + A + "videoFile") is None:
+            rel = slide.part.rels.get(rid)
+            reltype = (getattr(rel, "reltype", "") or "")
+            if rel is not None and "image" in reltype.lower():
+                try:
+                    if rel.is_external:
+                        if os.path.exists(rel.target_ref):
+                            blob = open(rel.target_ref, "rb").read()
+                            rec = eng.save_image(slide_no, rid, blob, rel.target_ref.rsplit(".", 1)[-1], rel.target_ref)
+                        else:
+                            rec = {"relId": rid, "originalName": rel.target_ref, "format": None,
+                                   "fileSize": 0, "dimensions": None, "src": None, "original": None,
+                                   "status": "linked-missing", "error": "external image not found: " + rel.target_ref}
+                    else:
+                        part = rel.target_part
+                        rec = eng.save_image(slide_no, rid, part.blob, part.partname.ext, str(part.partname))
+                except Exception as e:
+                    rec = {"relId": rid, "originalName": None, "format": None, "fileSize": 0,
+                           "dimensions": None, "src": None, "original": None,
+                           "status": "failed", "error": "image extract: %s" % e}
+                small = geo["width"] < STAGE_W * 0.18 and geo["height"] < STAGE_H * 0.18 and geo["y"] < STAGE_H * 0.14
+                ids["image"] += 1
+                o = {"id": "image-%03d" % ids["image"], "type": "image",
+                     "role": "logo" if small else "figure", "zIndex": len(objs)}
+                o.update(geo); o.update(rec); objs.append(o)
+                continue
 
         # table
         if getattr(sh, "has_table", False):
@@ -497,12 +575,22 @@ def main():
     if os.path.isdir(outdir):
         shutil.rmtree(outdir, ignore_errors=True)
     eng = Engine(outdir)
-    shutil.copyfile(src, os.path.join(outdir, "raw_pptx", os.path.basename(src)))
+    # Unzip the PPTX (it is a ZIP) so ppt/media + rels are available for the
+    # raw relationship-based media extractor and cross-check.
+    with zipfile.ZipFile(src) as _z:
+        _z.extractall(os.path.join(outdir, "raw_pptx"))
 
     prs = Presentation(src)
     W, H = int(prs.slide_width), int(prs.slide_height)
     aspect = "16:9" if abs(W / H - 16 / 9) < 0.02 else ("4:3" if abs(W / H - 4 / 3) < 0.02 else "%d:%d" % (W, H))
     MASTER_LEVELS = build_master_levels(prs.slide_masters[0])
+    # Resolve theme fonts BEFORE walking (used to sanitize '+mn-lt'/'+mj-lt' refs)
+    fs0 = prs.slide_masters[0].element.find(".//a:fontScheme", NS)
+    if fs0 is not None:
+        mj0 = fs0.find(".//a:majorFont/a:latin", NS)
+        mn0 = fs0.find(".//a:minorFont/a:latin", NS)
+        THEME_FONTS["+mj"] = mj0.get("typeface") if mj0 is not None else None
+        THEME_FONTS["+mn"] = mn0.get("typeface") if mn0 is not None else None
     chrome = extract_chrome(prs, eng, W, H)
 
     slide_files = []
@@ -511,7 +599,23 @@ def main():
         n = i + 1
         ids = {"text": 0, "image": 0, "video": 0, "table": 0, "line": 0, "shape": 0, "chart": 0}
         objs = []
+        # slide background image (picture fill on the slide bg)
+        bgrid = bg_blip_rid(slide._element)
+        if bgrid:
+            rel = slide.part.rels.get(bgrid)
+            if rel is not None and not getattr(rel, "is_external", False) and "image" in (rel.reltype or "").lower():
+                try:
+                    part = rel.target_part
+                    rec = eng.save_image(n, bgrid, part.blob, part.partname.ext, str(part.partname))
+                    bo = {"id": "image-bg", "type": "image", "role": "background",
+                          "x": 0, "y": 0, "width": STAGE_W, "height": STAGE_H}
+                    bo.update(rec); objs.append(bo)
+                except Exception:
+                    pass
         walk(slide.shapes, eng, W, H, slide, n, ids, objs)
+        for zi, o in enumerate(objs):           # z-order = document order
+            o["zIndex"] = zi
+            o.setdefault("groupId", None)
         try:
             bg = rgb_or_none(slide.background.fill.fore_color)
         except Exception:

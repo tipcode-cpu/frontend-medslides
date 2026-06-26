@@ -203,11 +203,21 @@
 }
 .ds-para { margin: 0; }
 .ds-para span { line-height: inherit; }
-.ds-bullet {                       /* main/sub bullet, navy like source */
-  color: var(--ds-title-color);
+.ppt-bullet {                      /* explicit PPT bullet, sized to body text */
+  color: var(--ds-title-color);    /* navy default; overridden inline if PPT sets one */
   font-weight: 700;
+  margin-right: 0.35em;
 }
+.ppt-bullet-text { }
 .ds-annotation { color: var(--ds-ink); }
+
+/* Click routing: text passes clicks THROUGH to the nav zones beneath; figures
+   and videos capture their own clicks (zoom / playback). */
+.fm-obj { pointer-events: none; }
+.ds-figure__img, .ds-video, .ds-video-fallback, .ds-video-badge,
+.ds-table, .ds-logo { pointer-events: auto; }
+.fm-bg-image { z-index: 0; pointer-events: none; }
+.fm-bg-image img { width: 100%; height: 100%; object-fit: cover; }
 
 /* === Missing-asset placeholder (P0: never a broken image) ======= */
 .ds-missing {

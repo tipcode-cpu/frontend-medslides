@@ -40,6 +40,35 @@
   user-select: none;
 }
 
+/* --- Mouse navigation zones (PowerPoint-like: click to advance) --- */
+.fm-nav-zone {
+  position: absolute;
+  top: 0; bottom: 0;
+  z-index: 1;                 /* above bg, below figures/videos/chrome */
+  pointer-events: auto;
+}
+.fm-nav-zone-left  { left: 0;   width: 25%; cursor: w-resize; }
+.fm-nav-zone-right { left: 25%; width: 75%; cursor: e-resize; }
+
+/* --- Debug overlay (press D) --- */
+.fm-debug .fm-obj { outline: 1px solid rgba(0,128,255,.7); }
+.fm-debug .fm-obj[data-id]::after {
+  content: attr(data-id);
+  position: absolute; top: 0; left: 0;
+  font: 11px/1.2 monospace; color: #fff; background: rgba(0,90,200,.85);
+  padding: 0 3px; pointer-events: none;
+}
+.fm-debug .fm-nav-zone-left  { background: rgba(255,180,0,.10); }
+.fm-debug .fm-nav-zone-right { background: rgba(0,200,120,.10); }
+.fm-debug .ds-missing { outline: 3px solid #f00; }
+.fm-obj.fm-overlap { outline: 2px solid #e00 !important; }
+#fm-debug-info {
+  position: fixed; top: 10px; left: 10px; z-index: 120;
+  font: 13px monospace; color: #fff; background: rgba(180,0,0,.85);
+  padding: 6px 10px; border-radius: 6px; display: none; white-space: pre;
+}
+.fm-debug #fm-debug-info { display: block; }
+
 /* --- Figure zoom/pan viewer (transient overlay) --- */
 #fm-viewer {
   position: fixed; inset: 0;
