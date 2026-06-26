@@ -21,6 +21,12 @@ from collections import Counter
 from pptx import Presentation
 from pptx.util import Emu
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+try:
+    from PIL import Image            # optional: rasterize WMF/EMF for the browser
+    _HAS_PIL = True
+except Exception:
+    _HAS_PIL = False
 try:
     from pptx.enum.dml import MSO_COLOR_TYPE
 except Exception:  # pragma: no cover
@@ -192,9 +198,21 @@ def walk(shapes, W, H, out, assets_dir, slide_no, abs_xform=None, counters=None)
             counters["img"] += 1
             try:
                 img = sh.image
-                name = "s%02d_img%02d.%s" % (slide_no, counters["img"], img.ext)
+                base = "s%02d_img%02d" % (slide_no, counters["img"])
+                name = base + "." + img.ext
                 with open(os.path.join(assets_dir, name), "wb") as f:
                     f.write(img.blob)
+                # Browsers cannot render WMF/EMF (common in legacy medical decks).
+                # Rasterize to PNG so the figure survives; drop the bulky source.
+                if img.ext.lower() in ("wmf", "emf") and _HAS_PIL:
+                    try:
+                        im = Image.open(os.path.join(assets_dir, name)); im.load()
+                        png = base + ".png"
+                        im.save(os.path.join(assets_dir, png))
+                        os.remove(os.path.join(assets_dir, name))
+                        name = png
+                    except Exception:
+                        pass  # keep original; renderer may still fail, but no crash
                 px = img.size  # (w,h) native pixels
             except Exception:
                 name, px = None, None
