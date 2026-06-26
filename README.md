@@ -34,19 +34,40 @@ Kaplan–Meier curves, clinical tables. Offline-absolute (no CDN; local fonts).
 
 ---
 
-## Architecture
+## Architecture — Extraction-first pipeline
 
-A one-time **build** produces a portable presentation; a small **runtime**
-(mouse-first navigation, fullscreen, figure zoom/pan) plays it — independent of
-slide content. See [`ARCHITECTURE.md`](ARCHITECTURE.md), [`VISION.md`](VISION.md),
-[`REQUIREMENTS.md`](REQUIREMENTS.md).
+The **Extraction Engine is the core**. It extracts, preserves, and reports every
+meaningful PowerPoint object as structured data *before* any HTML exists. HTML is
+generated only after extraction and validation succeed.
 
 ```
-extractor/extract_design_system.py   PPTX  -> design-extract.json (geometry, runs,
-                                              tables, lines, grouped figures)
-build.py                             JSON  -> semantic component HTML (Layer 1 + 2)
-validate.py                          automated fidelity checks (the "compare" step)
+PPTX → Extraction Engine → Validation Engine → Slide JSON → HTML Generator → HTML
+```
+
+```
+extractor/extraction_engine.py   PPTX -> extract/ (per-slide JSON, organized
+                                 assets, manifest.json) — the source of truth
+validation/validate.py           extract/ -> asset/font/media reports + report.md;
+                                 stamps manifest pass/fail
+build.py                         validated extract/ -> interactive HTML
+                                 (refuses unless validation passed)
+run.py                           orchestrates extract → validate → build
 engine/  stage.css · components.css · ui.css · interaction.js
+```
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md), [`VISION.md`](VISION.md),
+[`REQUIREMENTS.md`](REQUIREMENTS.md).
+
+The `extract/` folder (the source of truth):
+
+```
+extract/
+├── raw_pptx/                  original PPTX
+├── assets/{images,videos,logos,icons,audio,unsupported}/
+├── slides/slideNN.json        structured slide (geometry px, paragraphs/runs
+│                              with resolved font metadata, bullets, spacing)
+├── validation/{asset-report,font-report,media-report}.json + report.md
+└── manifest.json              deck · design system · chrome · counts · validation
 ```
 
 ---
@@ -56,22 +77,18 @@ engine/  stage.css · components.css · ui.css · interaction.js
 ```bash
 pip install python-pptx pillow
 
-# 1. (optional) generate a representative medical sample deck
-python samples/make_sample_pptx.py
+# one command: extract → validate → generate HTML
+python run.py "my-deck.pptx" out/
+# -> out/extract/  (source of truth + reports)   out/build/presentation.html
 
-# 2. extract the design system + slide objects
-python extractor/extract_design_system.py samples/sample.pptx samples/extract
-
-# 3. reconstruct as semantic component HTML
-python build.py samples/extract/design-extract.json samples/build
-
-# 4. verify fidelity (semantic, geometry, branding, no flattening)
-python validate.py samples/extract/design-extract.json samples/build/presentation.html
-
-# open samples/build/presentation.html in a browser
+# or run the stages individually:
+python extractor/extraction_engine.py my-deck.pptx out/extract
+python validation/validate.py out/extract          # writes report.md, sets pass/fail
+python build.py out/extract out/build              # refuses unless validation passed
 ```
 
-Use your own deck by passing its `.pptx` to step 2.
+Generate a representative medical sample deck with
+`python samples/make_sample_pptx.py`.
 
 **Navigation:** mouse `‹ › ⛶` controls · arrows/space · `F` fullscreen ·
 click a figure to zoom/pan · `#3` deep-links to a slide.
