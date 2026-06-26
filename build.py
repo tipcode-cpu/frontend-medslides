@@ -69,13 +69,15 @@ def missing_box(o, what):
 
 
 # ---------- text ----------
-def run_spans(runs, F, fallback_pt):
+def run_spans(runs, F, fallback_pt, fit=False):
     out = []
     for r in runs:
         st = ""
         sz = r.get("fontSize") or fallback_pt
         if sz:
-            st += "font-size:%gpx;" % (sz * F)
+            # titles: size is scalable via --ds-title-fit so JS can auto-shrink
+            # an overflowing (e.g. 3-line) title to fit its box (PowerPoint autofit).
+            st += ("font-size:calc(%gpx * var(--ds-title-fit, 1));" if fit else "font-size:%gpx;") % (sz * F)
         st += "font-weight:%s;" % (r.get("fontWeight") or 400)
         if r.get("italic"):
             st += "font-style:italic;"
@@ -108,7 +110,7 @@ def para_style(p, F):
     return st
 
 
-def render_paras(paras, F, fallback_pt, bullets=True):
+def render_paras(paras, F, fallback_pt, bullets=True, fit=False):
     html = []
     for p in paras:
         fb = max((r.get("fontSize") for r in p["runs"] if r.get("fontSize")), default=fallback_pt)
@@ -119,7 +121,7 @@ def render_paras(paras, F, fallback_pt, bullets=True):
             bc = ("color:%s;" % p["bulletColor"]) if p.get("bulletColor") else ""
             bullet = ('<span class="ppt-bullet" style="font-size:%gpx;%s%s">%s</span>'
                       % (bsz, bf, bc, escape(p["bullet"])))
-        text = '<span class="ppt-bullet-text">%s</span>' % run_spans(p["runs"], F, fb)
+        text = '<span class="ppt-bullet-text">%s</span>' % run_spans(p["runs"], F, fb, fit)
         html.append('<div class="ds-para" style="%s">%s%s</div>'
                     % (para_style(p, F), bullet, text))
     return "".join(html)
@@ -172,7 +174,7 @@ def render_object(o, F, ds, extract_dir):
     if t == "text":
         paras = o["paragraphs"]
         if role == "title":
-            inner = '<h1 class="ds-title">%s</h1>' % render_paras(paras, F, ds.get("titleSizePt") or 40, bullets=False)
+            inner = '<h1 class="ds-title">%s</h1>' % render_paras(paras, F, ds.get("titleSizePt") or 40, bullets=False, fit=True)
         elif role == "section-title":
             inner = '<h2 class="ds-section-title">%s</h2>' % render_paras(paras, F, 32, bullets=False)
         elif role in ("footer", "citation"):

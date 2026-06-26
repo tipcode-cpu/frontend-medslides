@@ -151,7 +151,7 @@ def parse_props(el):
         if df.get("sz"):
             p["fontSize"] = int(df.get("sz")) / 100.0
         if df.get("b") is not None:
-            p["fontWeight"] = 700 if df.get("b") == "1" else 400
+            p["fontWeight"] = 700 if df.get("b") in ("1", "true", "on") else 400
         sr = df.find("a:solidFill/a:srgbClr", NS)
         if sr is not None:
             p["color"] = "#" + sr.get("val").lower()
@@ -195,9 +195,9 @@ def parse_run_props(rPr):
     if rPr.get("sz"):
         p["fontSize"] = int(rPr.get("sz")) / 100.0
     if rPr.get("b") is not None:
-        p["fontWeight"] = 700 if rPr.get("b") == "1" else 400
+        p["fontWeight"] = 700 if rPr.get("b") in ("1", "true", "on") else 400
     if rPr.get("i") is not None:
-        p["italic"] = rPr.get("i") == "1"
+        p["italic"] = rPr.get("i") in ("1", "true", "on")
     if rPr.get("u") not in (None, "none"):
         p["underline"] = True
     sr = rPr.find("a:solidFill/a:srgbClr", NS)
