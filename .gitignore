@@ -1,0 +1,15 @@
+# Generated artifacts (regenerable via the pipeline)
+samples/extract/
+samples/build/
+samples/figs/
+samples/sample.pptx
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,80 @@
+/* ============================================================================
+   stage.css — Fixed presentation stage + uniform scaling
+   ----------------------------------------------------------------------------
+   Responsibility: hold every slide on a fixed 1920×1080 logical canvas and
+   scale the WHOLE stage uniformly to the viewport (letterbox/pillarbox).
+   Slide CONTENT never reflows — only the stage scales. This preserves the
+   author's layout (REQUIREMENTS LAY-02/03/08).
+
+   This file owns geometry ONLY. Visual design lives in components.css.
+   Interaction (nav/zoom) lives in interaction.js. Keep them separate.
+   ========================================================================== */
+
+:root {
+  /* Logical design size. Every coordinate in the deck is authored at this size
+     and scaled as a whole. Do NOT change per-slide. */
+  --stage-w: 1920;
+  --stage-h: 1080;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000;            /* letterbox bars */
+  overflow: hidden;
+}
+
+/* The viewport wrapper fills the window and centers the scaled stage. */
+.fm-viewport {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+/* The stage is the fixed logical canvas. It is scaled via CSS variable --scale
+   set by interaction.js on resize. Transform keeps content crisp and avoids
+   reflow. */
+.fm-stage {
+  position: relative;
+  width: calc(var(--stage-w) * 1px);
+  height: calc(var(--stage-h) * 1px);
+  transform: scale(var(--scale, 1));
+  transform-origin: center center;
+  overflow: hidden;
+  background: #fff;            /* default slide paper; overridden by background layer */
+}
+
+/* Each slide stacks in the same place; only the active one is visible.
+   Use visibility/opacity (NOT display) so absolutely-positioned children keep
+   their geometry and we can cross-fade. */
+.fm-slide {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.fm-slide.is-active {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-slide { transition: none; }
+}
+
+/* Absolute object placement inside a slide. Geometry is emitted by the build
+   as inline left/top/width/height in stage px (converted from PowerPoint EMU).
+   This is how figure/citation/logo placement is preserved while elements stay
+   semantic and editable. */
+.fm-obj {
+  position: absolute;
+  overflow: visible;
+}

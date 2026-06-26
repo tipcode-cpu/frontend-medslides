@@ -1,0 +1,199 @@
+/* ============================================================================
+   components.css — Reusable medical-slide design-system components (Layer 1)
+   ----------------------------------------------------------------------------
+   Every component is driven by design TOKENS (CSS custom properties) that the
+   extractor fills from the PowerPoint design system. Editing a token re-themes
+   every slide — that is the "reusable design system" goal (VISION, REQUIREMENTS).
+
+   Components map 1:1 to semantic HTML (Layer 2):
+     .ds-title        -> <h1>          .ds-citation  -> <cite>
+     .ds-section-title-> <h2>          .ds-table     -> <table>
+     .ds-text         -> text block    .ds-logo      -> branding <img>
+     .ds-figure       -> <figure>      .ds-footer    -> <footer>
+     .ds-caption      -> <figcaption>  .ds-bottom-line, .ds-bg -> CSS components
+
+   Offline-absolute: fonts default to LOCAL stacks (incl. Korean). No CDN.
+   Swap --ds-font-* to the institution's bundled fonts when available.
+   ========================================================================== */
+
+:root {
+  /* --- Typography tokens (filled from PPT theme) --- */
+  --ds-font-sans: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo",
+                  "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
+  --ds-font-serif: "Times New Roman", "Batang", serif;
+
+  --ds-title-size: 44px;
+  --ds-title-weight: 700;
+  --ds-section-size: 36px;
+  --ds-body-size: 24px;
+  --ds-caption-size: 18px;
+  --ds-citation-size: 14px;
+  --ds-line: 1.3;
+
+  /* --- Color tokens --- */
+  --ds-bg: #ffffff;
+  --ds-ink: #1a1a1a;            /* primary text */
+  --ds-ink-muted: #555;         /* captions */
+  --ds-brand: #1f4e79;          /* institutional blue */
+  --ds-brand-line: #1f4e79;     /* the bottom blue line */
+  --ds-accent: #c00000;
+
+  /* --- Spacing / chrome geometry tokens (stage px) --- */
+  --ds-margin-x: 96px;
+  --ds-bottom-line-y: 996px;    /* line baseline from top of 1080 stage */
+  --ds-bottom-line-h: 6px;
+  --ds-footer-y: 1012px;
+  --ds-figure-gap: 24px;
+}
+
+/* === Background layer (CSS component) ============================ */
+.ds-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--ds-slide-bg, var(--ds-bg));
+  z-index: 0;
+}
+
+/* === Titles ===================================================== */
+.ds-title {
+  margin: 0;
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-title-size);
+  font-weight: var(--ds-title-weight);
+  line-height: var(--ds-line);
+  color: var(--ds-title-color, var(--ds-ink));
+}
+.ds-section-title {
+  margin: 0;
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-section-size);
+  font-weight: 700;
+  color: var(--ds-brand);
+}
+
+/* === Body text ================================================== */
+.ds-text {
+  margin: 0;
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-body-size);
+  line-height: var(--ds-line);
+  color: var(--ds-ink);
+}
+.ds-text p { margin: 0 0 0.5em; }
+.ds-text ul { margin: 0; padding-left: 1.2em; }
+
+/* === Figure frame (figure-first; the priority component) ======== */
+.ds-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-figure-gap);
+  width: 100%;
+  height: 100%;
+}
+.ds-figure__img {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;          /* preserve aspect ratio — never stretch/crop */
+  cursor: zoom-in;              /* click-to-enlarge affordance (interaction.js) */
+}
+/* Multi-panel composite: preserved as one unit, panels not rearranged */
+.ds-figure--multipanel .ds-figure__panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  gap: var(--ds-figure-gap);
+  grid-template-columns: repeat(var(--ds-panels-cols, 2), 1fr);
+  grid-template-rows: repeat(var(--ds-panels-rows, 2), 1fr);
+}
+.ds-figure--multipanel .ds-figure__panel {
+  position: relative;
+  min-height: 0;
+}
+.ds-figure--multipanel img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+.ds-figure__panel-label {
+  position: absolute;
+  top: 6px; left: 8px;
+  font-family: var(--ds-font-sans);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--ds-ink);
+  background: rgba(255,255,255,.7);
+  padding: 0 6px; border-radius: 3px;
+}
+
+/* === Caption =================================================== */
+.ds-caption {
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-caption-size);
+  line-height: 1.25;
+  color: var(--ds-ink-muted);
+}
+
+/* === Citation (secondary, stable) ============================== */
+.ds-citation {
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-citation-size);
+  font-style: normal;
+  color: var(--ds-ink-muted);
+  white-space: nowrap;
+}
+
+/* === Medical table ============================================= */
+.ds-table {
+  border-collapse: collapse;
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-body-size);
+  width: 100%;
+  height: 100%;
+}
+.ds-table th, .ds-table td {
+  border: 1px solid #bbb;
+  padding: 6px 10px;
+  text-align: left;
+}
+.ds-table thead th {
+  background: var(--ds-brand);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* === Branding: logo ============================================ */
+.ds-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* === Footer + bottom blue line (reusable chrome components) ===== */
+.ds-bottom-line {
+  position: absolute;
+  left: 0; right: 0;
+  top: var(--ds-bottom-line-y);
+  height: var(--ds-bottom-line-h);
+  background: var(--ds-brand-line);
+  z-index: 5;
+}
+.ds-footer {
+  position: absolute;
+  left: var(--ds-margin-x); right: var(--ds-margin-x);
+  top: var(--ds-footer-y);
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-citation-size);
+  color: var(--ds-ink-muted);
+  display: flex;
+  justify-content: space-between;
+  z-index: 5;
+}
+
+/* Raw runs of text from PowerPoint keep inline emphasis (italic/bold/sup/sub). */
+.fm-run-b { font-weight: 700; }
+.fm-run-i { font-style: italic; }
+.fm-run-u { text-decoration: underline; }
+sup, sub { font-size: 0.7em; }
